@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     
     const token = generateToken(tokenPayload)
     
-    // Set HTTP-only cookie
+    // Set HTTP-only cookie for web browsers
     await setTokenCookie(token)
 
     // Get dashboard route based on user role
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       message: authResult.message,
+      token: token, // Include JWT token in response for mobile apps
       user: {
         id: authResult.user!.id,
         firstName: authResult.user!.first_name,
@@ -69,9 +70,11 @@ export async function POST(request: NextRequest) {
         isFirstLogin: authResult.user!.isfirstlogin,
       },
       redirectUrl: dashboardRoute,
+      // Add token expiry info for mobile apps
+      tokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
     })
 
-    // Also set the cookie in response headers as fallback
+    // Also set the cookie in response headers as fallback for web browsers
     response.cookies.set('auth-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

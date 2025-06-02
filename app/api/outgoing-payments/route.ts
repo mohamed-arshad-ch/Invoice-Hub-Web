@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@/lib/generated/prisma"
 import type { CreateOutgoingPaymentRequest } from "@/lib/types/outgoing-payment"
+import { requireAuth, createUnauthorizedResponse } from "@/lib/middleware-auth"
 
 // Create a global Prisma instance with better error handling
 let prisma: PrismaClient
@@ -43,6 +44,12 @@ async function checkDatabaseConnection() {
 // GET /api/outgoing-payments - Get all outgoing payments
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user (supports both web cookies and mobile Authorization headers)
+    const user = await requireAuth(request)
+    if (!user) {
+      return createUnauthorizedResponse()
+    }
+
     // Check database connection first
     const isConnected = await checkDatabaseConnection()
     if (!isConnected) {
@@ -152,7 +159,15 @@ export async function GET(request: NextRequest) {
       } : null
     }))
 
-    return NextResponse.json({ payments: formattedPayments })
+    return NextResponse.json({ 
+      success: true,
+      payments: formattedPayments,
+      user: {
+        id: user.userId,
+        email: user.email,
+        role: user.role
+      }
+    })
 
   } catch (error: any) {
     console.error("Error fetching outgoing payments:", error)
@@ -181,6 +196,12 @@ export async function GET(request: NextRequest) {
 // POST /api/outgoing-payments - Create new outgoing payment
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user (supports both web cookies and mobile Authorization headers)
+    const user = await requireAuth(request)
+    if (!user) {
+      return createUnauthorizedResponse()
+    }
+
     // Check database connection first
     const isConnected = await checkDatabaseConnection()
     if (!isConnected) {
@@ -254,8 +275,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // TODO: Get user ID from session/auth
-    const createdBy = 1 // Hardcoded for now
+    // Use authenticated user ID instead of hardcoded value
+    const createdBy = user.userId
 
     // Prepare data for creation - only include IDs that exist
     const paymentData: any = {
@@ -329,7 +350,10 @@ export async function POST(request: NextRequest) {
       } : null
     }
 
-    return NextResponse.json({ payment: formattedPayment }, { status: 201 })
+    return NextResponse.json({ 
+      success: true, 
+      payment: formattedPayment 
+    }, { status: 201 })
 
   } catch (error: any) {
     console.error("Error creating outgoing payment:", error)
