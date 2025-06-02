@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model clients {
+  id                              Int       @id @default(autoincrement())
+  client_id                       String    @db.VarChar(20)
+  business_name                   String    @db.VarChar(255)
+  contact_person                  String    @db.VarChar(255)
+  email                           String    @db.VarChar(255)
+  phone                           String    @db.VarChar(50)
+  street                          String?   @db.VarChar(255)
+  city                            String?   @db.VarChar(255)
+  state                           String?   @db.VarChar(50)
+  zip                             String?   @db.VarChar(20)
+  payment_schedule                String    @db.VarChar(20)
+  payment_terms                   String    @db.VarChar(20)
+  status                          Boolean   @default(true)
+  notes                           String?
+  total_spent                     Decimal?  @default(0) @db.Decimal(10, 2)
+  last_payment                    DateTime? @db.Date
+  upcoming_payment                DateTime? @db.Date
+  joined_date                     DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  created_by                      Int
+  created_at                      DateTime  @default(now()) @db.Timestamp(6)
+  updated_at                      DateTime  @default(now()) @db.Timestamp(6)
+  users_clients_created_byTousers users     @relation("clients_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_users_client_idToclients  users[]   @relation("users_client_idToclients")
+  invoices                        invoices[]
+  quotations                      quotations[]
+
+  @@index([created_by], map: "idx_clients_created_by")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model products {
+  id                 Int                 @id @default(autoincrement())
+  name               String              @db.VarChar(255)
+  description        String
+  category           String              @db.VarChar(50)
+  price              Decimal             @db.Decimal(10, 2)
+  tax_rate           Decimal?            @default(0) @db.Decimal(5, 2)
+  status             String              @db.VarChar(20)
+  created_by         Int
+  created_at         DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?           @default(now()) @db.Timestamptz(6)
+  sku                String?             @unique @db.VarChar(100)
+  stock_quantity     Int?                @default(0)
+  is_featured        Boolean?            @default(false)
+  is_new             Boolean?            @default(false)
+  sale_price         Decimal?            @db.Decimal(10, 2)
+  weight             Decimal?            @db.Decimal(10, 2)
+  dimensions_json    Json?
+  meta_title         String?             @db.VarChar(255)
+  meta_description   String?
+  slug               String?             @unique @db.VarChar(255)
+  service_work_hours Int?                @default(0)
+  work_hour_by_day   String?             @db.VarChar(255)
+  work_hours_per_day Decimal?            @db.Decimal(5, 2)
+  users              users               @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  invoice_line_items invoice_line_items[]
+  quotation_line_items quotation_line_items[]
+  outgoing_payments  outgoing_payments[]
+
+  @@index([category], map: "idx_product_category")
+  @@index([status], map: "idx_product_status")
+  @@index([category], map: "idx_products_category")
+  @@index([created_by], map: "idx_products_created_by")
+  @@index([status], map: "idx_products_status")
+}
+
+model invoices {
+  id                  Int                  @id @default(autoincrement())
+  invoice_number      String               @unique @db.VarChar(50)
+  client_id           Int
+  client_name         String               @db.VarChar(255)
+  client_email        String?              @db.VarChar(255)
+  issue_date          DateTime             @db.Date
+  due_date            DateTime             @db.Date
+  subtotal            Decimal              @db.Decimal(10, 2)
+  tax_rate_percent    Decimal              @default(0) @db.Decimal(5, 2)
+  tax_amount          Decimal              @db.Decimal(10, 2)
+  total_amount        Decimal              @db.Decimal(10, 2)
+  amount_paid         Decimal              @default(0) @db.Decimal(10, 2)
+  balance_due         Decimal              @db.Decimal(10, 2)
+  status              String               @db.VarChar(50)
+  payment_terms       String?              @db.VarChar(255)
+  notes               String?
+  payment_instructions String?
+  created_by          Int
+  created_at          DateTime             @default(now()) @db.Timestamp(6)
+  updated_at          DateTime             @default(now()) @db.Timestamp(6)
+  
+  client              clients              @relation(fields: [client_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  creator             users                @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  line_items          invoice_line_items[]
+
+  @@index([client_id], map: "idx_invoices_client_id")
+  @@index([status], map: "idx_invoices_status")
+  @@index([created_by], map: "idx_invoices_created_by")
+  @@index([invoice_number], map: "idx_invoices_number")
+}
+
+model invoice_line_items {
+  id           Int      @id @default(autoincrement())
+  invoice_id   Int
+  product_id   Int?
+  product_name String   @db.VarChar(255)
+  description  String?
+  quantity     Decimal  @db.Decimal(10, 2)
+  unit_price   Decimal  @db.Decimal(10, 2)
+  amount       Decimal  @db.Decimal(10, 2)
+  created_at   DateTime @default(now()) @db.Timestamp(6)
+  updated_at   DateTime @default(now()) @db.Timestamp(6)
+
+  invoice      invoices  @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product      products? @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([invoice_id], map: "idx_invoice_line_items_invoice_id")
+  @@index([product_id], map: "idx_invoice_line_items_product_id")
+}
+
+model staff {
+  id                Int       @id @default(autoincrement())
+  name              String    @db.VarChar(255)
+  email             String    @unique @db.VarChar(255)
+  phone             String?   @db.VarChar(20)
+  address_street    String?   @db.VarChar(255)
+  address_city      String?   @db.VarChar(100)
+  address_state     String?   @db.VarChar(100)
+  address_zip       String?   @db.VarChar(20)
+  address_country   String?   @db.VarChar(100)
+  position          String    @db.VarChar(255)
+  department        String?   @db.VarChar(100)
+  join_date         DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  status            String    @default("active") @db.VarChar(50)
+  avatar            String?   @db.VarChar(255)
+  role              String    @default("support") @db.VarChar(50)
+  payment_rate      Decimal   @db.Decimal(10, 2)
+  salary            Decimal?  @db.Decimal(10, 2)
+  permissions       String[]  @default([])
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
+  payment_frequency String?   @default("hourly") @db.VarChar(255)
+  payment_type      String?   @default("hourly") @db.VarChar(50)
+  payment_duration  String?   @default("hourly") @db.VarChar(50)
+  payment_time      String?   @default("daily") @db.VarChar(255)
+  users             users[]
+  outgoing_payments outgoing_payments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                                Int        @id @default(autoincrement())
+  first_name                        String     @db.VarChar(255)
+  last_name                         String     @db.VarChar(255)
+  email                             String     @unique @db.VarChar(255)
+  password_hash                     String     @db.VarChar(255)
+  company_name                      String     @db.VarChar(255)
+  role                              String     @db.VarChar(50)
+  created_at                        DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at                        DateTime?  @default(now()) @db.Timestamptz(6)
+  client_id                         Int?
+  staff_id                          Int?
+  isfirstlogin                      Boolean    @default(true)
+  clients_clients_created_byTousers clients[]  @relation("clients_created_byTousers")
+  invoices                          invoices[]
+  products                          products[]
+  clients_users_client_idToclients  clients?   @relation("users_client_idToclients", fields: [client_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  staff                             staff?     @relation(fields: [staff_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quotations                        quotations[] @relation("quotations_created_by")
+  outgoing_payments                 outgoing_payments[] @relation("outgoing_payments_created_by")
+
+  @@index([email], map: "idx_users_email")
+}
+
+model quotations {
+  id                  Int                      @id @default(autoincrement())
+  quotation_number    String                   @unique @db.VarChar(50)
+  client_id           Int
+  client_name         String                   @db.VarChar(255)
+  client_email        String?                  @db.VarChar(255)
+  quotation_date      DateTime                 @db.Date
+  valid_until_date    DateTime                 @db.Date
+  subtotal            Decimal                  @db.Decimal(10, 2)
+  discount_type       String                   @default("percentage") @db.VarChar(20)
+  discount_value      Decimal                  @default(0) @db.Decimal(10, 2)
+  discount_amount     Decimal                  @default(0) @db.Decimal(10, 2)
+  tax_rate_percent    Decimal                  @default(0) @db.Decimal(5, 2)
+  tax_amount          Decimal                  @db.Decimal(10, 2)
+  total_amount        Decimal                  @db.Decimal(10, 2)
+  status              String                   @db.VarChar(50)
+  currency            String                   @default("USD") @db.VarChar(10)
+  terms_and_conditions String?
+  notes               String?
+  created_by          Int
+  created_at          DateTime                 @default(now()) @db.Timestamp(6)
+  updated_at          DateTime                 @default(now()) @db.Timestamp(6)
+  
+  client              clients                  @relation(fields: [client_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  creator             users                    @relation("quotations_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  line_items          quotation_line_items[]
+
+  @@index([client_id], map: "idx_quotations_client_id")
+  @@index([status], map: "idx_quotations_status")
+  @@index([created_by], map: "idx_quotations_created_by")
+  @@index([quotation_number], map: "idx_quotations_number")
+}
+
+model quotation_line_items {
+  id             Int       @id @default(autoincrement())
+  quotation_id   Int
+  product_id     Int?
+  product_name   String    @db.VarChar(255)
+  description    String?
+  quantity       Decimal   @db.Decimal(10, 2)
+  unit_price     Decimal   @db.Decimal(10, 2)
+  amount         Decimal   @db.Decimal(10, 2)
+  created_at     DateTime  @default(now()) @db.Timestamp(6)
+  updated_at     DateTime  @default(now()) @db.Timestamp(6)
+
+  quotation      quotations @relation(fields: [quotation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product        products?  @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([quotation_id], map: "idx_quotation_line_items_quotation_id")
+  @@index([product_id], map: "idx_quotation_line_items_product_id")
+}
+
+model expense_categories {
+  id                  Int                  @id @default(autoincrement())
+  name                String               @db.VarChar(255)
+  description         String?
+  status              String               @default("active") @db.VarChar(50)
+  created_at          DateTime             @default(now()) @db.Timestamp(6)
+  updated_at          DateTime             @default(now()) @db.Timestamp(6)
+  outgoing_payments   outgoing_payments[]
+
+  @@index([status], map: "idx_expense_categories_status")
+}
+
+model outgoing_payments {
+  id                    Int                @id @default(autoincrement())
+  payment_number        String             @unique @db.VarChar(50)
+  payment_category      String             @db.VarChar(100)
+  expense_category_id   Int?
+  staff_id              Int?
+  product_id            Int?
+  payee_name            String?            @db.VarChar(255)
+  amount                Decimal            @db.Decimal(10, 2)
+  payment_date          DateTime           @db.Date
+  payment_method        String             @db.VarChar(50)
+  reference_number      String?            @db.VarChar(255)
+  status                String             @db.VarChar(50)
+  notes                 String?
+  attachments           Json?
+  created_by            Int
+  created_at            DateTime           @default(now()) @db.Timestamp(6)
+  updated_at            DateTime           @default(now()) @db.Timestamp(6)
+
+  expense_category      expense_categories? @relation(fields: [expense_category_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  staff                 staff?              @relation(fields: [staff_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  product               products?           @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  creator               users               @relation("outgoing_payments_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([payment_category], map: "idx_outgoing_payments_category")
+  @@index([status], map: "idx_outgoing_payments_status")
+  @@index([created_by], map: "idx_outgoing_payments_created_by")
+  @@index([payment_number], map: "idx_outgoing_payments_number")
+  @@index([expense_category_id], map: "idx_outgoing_payments_expense_category")
+  @@index([staff_id], map: "idx_outgoing_payments_staff")
+  @@index([product_id], map: "idx_outgoing_payments_product")
+}
